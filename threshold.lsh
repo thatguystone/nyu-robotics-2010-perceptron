@@ -62,7 +62,7 @@
 					(setq yuv (rgbToYuv cellV))
 					
 					(if (> threshold (yuvDistance yuv yuvMatch))
-						(bwImage i j 1)
+						(bwImage i j 255)
 						(bwImage i j 0)
 					)
 				)

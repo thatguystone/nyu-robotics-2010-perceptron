@@ -6,64 +6,44 @@
 	((-int-) size)
 	((-int-) calibrated)
 	((-idx2- (-double-)) weight)
-	((-idx2- (-double-)) colors)
-		((-int-) colorsDark)
-		((-int-) colorsNormal)
 )
 
 (defmethod perceptron perceptron ()
 	(setq size 50)
 	(setq weight (double-matrix (* size size)))
-	(setq colors [
-			[167 32 2]
-			[69 13 0]
-		]
-	)
-		(setq colorsNormal 0)
-		(setq colorsDark 1)
 )
 
 (defmethod perceptron showImage (bwImage)
 	(rgb-draw-matrix 20 20 bwImage 1 1)
 )
 
-(defmethod perceptron recognize (image)
-	((-idx3- (-ubyte-)) image)
+(defmethod perceptron recognize (path)
+	((-str-) path)
 
 	(let* (
+			;just some values we're going to use
 			(letter "a")
-			(wght 0.0)
-			(tmp 0)
-			(out (ubyte-matrix 1 1 1))
-			(thr (double-matrix (* size size)))
+			(wght 0)
 
-			(bwImage (threshold image (select :this:colors 0 0) 46))
+			(image (image-read-rgba path))
+
+			;the image we're looking at
+			(bwImage (threshold image [167 32 2] 46))
 			(cc (new CCAnalyzer bwImage))
-
-			(left 0)(right 0)(top 0)(bottom 0)
 		)
 
 		(if (==> cc run-analysis 125)
 			(progn
 				(==> cc cc-analysis)
 
-				(setq left (:cc:ccdesc 0 (cc-left)))
-				(setq right (:cc:ccdesc 0 (cc-right)))
-				(setq top (:cc:ccdesc 0 (cc-top)))
-				(setq bottom (:cc:ccdesc 0 (cc-bottom)))
+				;set our weight...
+				(setq wght (==> this sign (==> this doThreshold image (select :cc:ccdesc 0 0))))
 
-				(setq out (rgbaim-crop image left top (- right left) (- bottom top)))
-				(setq out (rgbaim-enlarge out (* size 2) (* size 2)))
-				(setq out (rgbaim-resize out (to-double size) (to-double size) 1))
-				(copy-matrix (threshold out (select :this:colors 0 0) 46) thr)
-				
-				(setq wght (==> this sign thr))
-
-				(print "Weight: " wght)
+				;(print "Weight: " wght)
 				
 				(if (> wght 0)
-					(setq letter "a")
-					(setq letter "e")
+					(setq letter "A")
+					(setq letter "E")
 				)
 			)
 
@@ -85,25 +65,23 @@
 
 		(while (= calibrated 0)
 			(setq calibrated 1)
-			(print "loop")
+
 			(for (i 0 (- (length files) 1))
 				(setq file (concat path "/" letter "/" (nth i files)))
 				(print file)
-				(==> this calibrateImage (image-read-rgba file) file letter :this:colorsNormal)
+				(==> this calibrateImage (image-read-rgba file) file letter)
 			)
 		)
 	)
 )
 
-(defmethod perceptron calibrateImage (image imagePath letter letterColors)
+(defmethod perceptron calibrateImage (image imagePath letter)
 	((-idx3- (-ubyte-)) image)
 	((-str-) imagePath)
 	((-str-) letter)
-	((-int-) letterColors)
 
 	(let* (
-			(colors (select :this:colors 0 letterColors))
-			(bwImage (threshold image colors 46))
+			(bwImage (threshold image [167 32 2] 46))
 			(cc (new CCAnalyzer bwImage))
 			(letterOther (if (= letter "a") "e" "a"))
 		)
@@ -113,47 +91,37 @@
 				(==> cc cc-analysis)
 				(==> this showImage bwImage)
 
-				;if we got a crappy read, then try another color (perhaps it was too dark? too light? etc)
+				;if we got a crappy read...disregard it and move on
 				(if (> (idx-dim :cc:ccdesc 0) 2)
-					(when (< (incr letterColors) (idx-dim :this:colors 0))
-						(print "Image was crap")
-						;(==> this calibrateImage image imagePath letter letterColors)
-					)
+					(print "Image was crap")
 
-					(==> this calibrateArea image (select :cc:ccdesc 0 0) colors letter)
-					(==> this calibrateArea image (select :cc:ccdesc 0 1) colors letterOther)
+					;there are two letters per calibration image, go for it
+					(==> this calibrateArea image (select :cc:ccdesc 0 0) letter)
+					(==> this calibrateArea image (select :cc:ccdesc 0 1) letterOther)
 				)
 			)
 		)
 	)
 )
 
-(defmethod perceptron calibrateArea (in area colors letter)
+(defmethod perceptron calibrateArea (in area letter)
 	((-idx3- (-ubyte-)) in)
 	((-idx1- (-int-)) area)
-	((-idx1- (-double-)) colors)
 	((-str-) letter)
 	
 	(let* (
+			;set our expected weight
 			(wght (if (= "a" letter) 1 -1))
-			(sn 0)
-			(term (double-matrix))
-			(out (ubyte-matrix 1 1 1))
-			(thr (double-matrix (* size size)))
-			(left (area (cc-left)))(right (area (cc-right)))(top (area (cc-top)))(bottom (area (cc-bottom)))
+			
+			(sn 0) ;we need this number numerous times, save it
+			(term (double-matrix)) ;idx-dotm0 needs a scalar...
+
+			(thr (==> this doThreshold in area))
 		)
-
-		;;add the extra 1 to the end of the image vector
-		;(thr (* size size) 1)
-
-		(setq out (rgbaim-crop in left top (- right left) (- bottom top)))
-		(setq out (rgbaim-enlarge out (* size 2) (* size 2))) ;we have to enlarge the image so that we can resize, because we can't scale up...
-		(setq out (rgbaim-resize out (to-double size) (to-double size) 1))
-		(copy-matrix (threshold out colors 46) thr)
 
 		(setq sn (==> this sign thr))
 		(term (* .5 (- wght sn))) ;the compiler was complaining when this was inline...
-		
+
 		(setq weight (idx-add weight (idx-dotm0 thr term))))
 
 		;see if we got the value we expected to get, otherwise, make it run it again
@@ -178,21 +146,59 @@
 	)
 )
 
+(defmethod perceptron doThreshold (image area)
+	((-idx3- (-ubyte-)) image)
+	((-idx1- (-int-)) area)
+	
+	(let* (
+			;for holding copies of things as we resize and shuffle around
+			(out (ubyte-matrix 1 1 1))
+			(thr (double-matrix (* size size)))
+			
+			;shortcuts for CC
+			(left (area (cc-left)))(right (area (cc-right)))(top (area (cc-top)))(bottom (area (cc-bottom)))
+		)
+
+		;get a workable copy of the image
+		(setq out (rgbaim-crop image left top (- right left) (- bottom top)))
+		(setq out (rgbaim-enlarge out (* size 2) (* size 2)))
+		(setq out (rgbaim-resize out (to-double size) (to-double size) 1))
+		(copy-matrix (threshold out [167 32 2] 46) thr)
+
+		thr
+	)
+)
+
 (de main ()
 	(let* (
 			(percept (new perceptron))
 			(window (x11-window 0 0 360 280 "Image"))
 		)
 
+		;the pictures are arranged into folders inside "calibrate/" depending on which letter comes first in the picture
+		(print "Calibrating...")
 		(==> percept calibrateDir "calibrate" "a")
 		(==> percept calibrateDir "calibrate" "e")
 
 		(pause "Calibration Done")
-		
-		(==> percept recognize (image-read-rgba "a.jpg"))
+
+		(print "Testing...")
+		(print "Should be: A")
+		(print (==> percept recognize "a.jpg"))
+
+		(print "Should be: E")
+		(print (==> percept recognize "e.jpg"))
+
+		(print "Should be: A")
+		(print (==> percept recognize "a2.jpg"))
+
+		(print "Should be: E")
+		(print (==> percept recognize "e2.jpg"))
 	)
 )
 
+;
+;Cannot build this code -- it fails immensely...every time...there's something wrong with compiling with idx-add, or matrix dimensions with copy-matrix, or something else
 ;(dhc-make ()
-;	(perceptron sign calibrateArea); recognize)
+;	(perceptron doThreshold sign calibrateArea)
 ;)
