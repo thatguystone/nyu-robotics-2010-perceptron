@@ -161,7 +161,7 @@
 
 		;get a workable copy of the image
 		(setq out (rgbaim-crop image left top (- right left) (- bottom top)))
-		(setq out (rgbaim-enlarge out (* size 2) (* size 2))) ;enlarge so that we can resize -- if the letter is too small, it refuses to scale up and crashes lush
+		(setq out (rgbaim-enlarge out 10 10)) ;enlarge so that we can resize -- if the letter is too small, it refuses to scale up and crashes lush
 		(setq out (rgbaim-resize out (to-double size) (to-double size) 1))
 		(copy-matrix (threshold out [167 32 2] 46) thr)
 
