@@ -17,6 +17,15 @@
 	(rgb-draw-matrix 20 20 bwImage 1 1)
 )
 
+(defmethod perceptron test (letter path)
+	(let (
+			(val (==> percept recognize path))
+		)
+
+		(printf "Should be: %s => %s -> %s\n" letter val (if (= val letter) "True" "False"))
+	)
+)
+
 (defmethod perceptron recognize (path)
 	((-str-) path)
 
@@ -28,7 +37,7 @@
 			(image (image-read-rgba path))
 
 			;the image we're looking at
-			(bwImage (threshold image [167 32 2] 46))
+			(bwImage (==> this threshold image))
 			(cc (new CCAnalyzer bwImage))
 		)
 
@@ -36,7 +45,7 @@
 			(progn
 				(==> cc cc-analysis)
 
-				;set our weight...
+				;find out what we have
 				(setq wght (==> this sign (==> this doThreshold image (select :cc:ccdesc 0 0))))
 
 				;(print "Weight: " wght)
@@ -65,7 +74,6 @@
 
 		(while (= calibrated 0)
 			(setq calibrated 1)
-
 			(for (i 0 (- (length files) 1))
 				(setq file (concat path "/" letter "/" (nth i files)))
 				(print file)
@@ -81,7 +89,7 @@
 	((-str-) letter)
 
 	(let* (
-			(bwImage (threshold image [167 32 2] 46))
+			(bwImage (==> this threshold image))
 			(cc (new CCAnalyzer bwImage))
 			(letterOther (if (= letter "a") "e" "a"))
 		)
@@ -92,7 +100,7 @@
 				(==> this showImage bwImage)
 
 				;if we got a crappy read...disregard it and move on
-				(if (> (idx-dim :cc:ccdesc 0) 2)
+				(if (<> (idx-dim :cc:ccdesc 0) 2)
 					(print "Image was crap")
 
 					;there are two letters per calibration image, go for it
@@ -146,6 +154,11 @@
 	)
 )
 
+(defmethod perceptron threshold (image)
+	((-idx3- (-ubyte-)) image)
+	(threshold image [167 32 2] 40)
+)
+
 (defmethod perceptron doThreshold (image area)
 	((-idx3- (-ubyte-)) image)
 	((-idx1- (-int-)) area)
@@ -163,7 +176,7 @@
 		(setq out (rgbaim-crop image left top (- right left) (- bottom top)))
 		(setq out (rgbaim-enlarge out 10 10)) ;enlarge so that we can resize -- if the letter is too small, it refuses to scale up and crashes lush
 		(setq out (rgbaim-resize out (to-double size) (to-double size) 1))
-		(copy-matrix (threshold out [167 32 2] 46) thr)
+		(copy-matrix (==> this threshold out) thr)
 
 		thr
 	)
@@ -180,20 +193,13 @@
 		(==> percept calibrateDir "calibrate" "a")
 		(==> percept calibrateDir "calibrate" "e")
 
-		(pause "Calibration Done")
+		;(pause "Calibration Done")
 
 		(print "Testing...")
-		(print "Should be: A")
-		(print (==> percept recognize "a.jpg"))
-
-		(print "Should be: E")
-		(print (==> percept recognize "e.jpg"))
-
-		(print "Should be: A")
-		(print (==> percept recognize "a2.jpg"))
-
-		(print "Should be: E")
-		(print (==> percept recognize "e2.jpg"))
+		(==> percept test "A" "a.jpg")
+		(==> percept test "E" "e.jpg")
+		(==> percept test "A" "a2.jpg")
+		(==> percept test "E" "e2.jpg")
 	)
 )
 
