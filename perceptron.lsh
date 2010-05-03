@@ -200,6 +200,12 @@
 		(==> percept test "E" "e.jpg")
 		(==> percept test "A" "a2.jpg")
 		(==> percept test "E" "e2.jpg")
+		(==> percept test "E" "e3.jpg")
+		(==> percept test "E" "e4.jpg")
+		(==> percept test "A" "a3.jpg")
+		(==> percept test "A" "a4.jpg")
+		(==> percept test "E" "e5.jpg")
+		(==> percept test "A" "a5.jpg")
 	)
 )
 
